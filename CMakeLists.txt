@@ -7,10 +7,10 @@ include_directories(
 		    ${OpenCV_INCLUDE_DIRS}
 )
 
-add_executable(main
+add_executable(ShadowDet
 		src/Main.cpp
 )
 
-target_link_libraries(main 
+target_link_libraries(ShadowDet 
 			${OpenCV_LIBS}
 )

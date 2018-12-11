@@ -111,17 +111,17 @@ depend:
 .PHONY : depend
 
 #=============================================================================
-# Target rules for targets named main
+# Target rules for targets named ShadowDet
 
 # Build rule for target.
-main: cmake_check_build_system
-	$(MAKE) -f CMakeFiles/Makefile2 main
-.PHONY : main
+ShadowDet: cmake_check_build_system
+	$(MAKE) -f CMakeFiles/Makefile2 ShadowDet
+.PHONY : ShadowDet
 
 # fast build rule for target.
-main/fast:
-	$(MAKE) -f CMakeFiles/main.dir/build.make CMakeFiles/main.dir/build
-.PHONY : main/fast
+ShadowDet/fast:
+	$(MAKE) -f CMakeFiles/ShadowDet.dir/build.make CMakeFiles/ShadowDet.dir/build
+.PHONY : ShadowDet/fast
 
 src/Main.o: src/Main.cpp.o
 
@@ -129,7 +129,7 @@ src/Main.o: src/Main.cpp.o
 
 # target to build an object file
 src/Main.cpp.o:
-	$(MAKE) -f CMakeFiles/main.dir/build.make CMakeFiles/main.dir/src/Main.cpp.o
+	$(MAKE) -f CMakeFiles/ShadowDet.dir/build.make CMakeFiles/ShadowDet.dir/src/Main.cpp.o
 .PHONY : src/Main.cpp.o
 
 src/Main.i: src/Main.cpp.i
@@ -138,7 +138,7 @@ src/Main.i: src/Main.cpp.i
 
 # target to preprocess a source file
 src/Main.cpp.i:
-	$(MAKE) -f CMakeFiles/main.dir/build.make CMakeFiles/main.dir/src/Main.cpp.i
+	$(MAKE) -f CMakeFiles/ShadowDet.dir/build.make CMakeFiles/ShadowDet.dir/src/Main.cpp.i
 .PHONY : src/Main.cpp.i
 
 src/Main.s: src/Main.cpp.s
@@ -147,7 +147,7 @@ src/Main.s: src/Main.cpp.s
 
 # target to generate assembly for a file
 src/Main.cpp.s:
-	$(MAKE) -f CMakeFiles/main.dir/build.make CMakeFiles/main.dir/src/Main.cpp.s
+	$(MAKE) -f CMakeFiles/ShadowDet.dir/build.make CMakeFiles/ShadowDet.dir/src/Main.cpp.s
 .PHONY : src/Main.cpp.s
 
 # Help Target
@@ -157,7 +157,7 @@ help:
 	@echo "... clean"
 	@echo "... depend"
 	@echo "... rebuild_cache"
-	@echo "... main"
+	@echo "... ShadowDet"
 	@echo "... edit_cache"
 	@echo "... src/Main.o"
 	@echo "... src/Main.i"

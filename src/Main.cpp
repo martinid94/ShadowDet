@@ -19,7 +19,7 @@ int main(int argc, char** argv){
   if (argc != 5){
     cout << endl;
     cout << "Run this executable by invoking it like this: " << endl;
-    cout << "   ./main ../data/flickr-4159721472_c55deb37d6_b.jpg 10 10 10" << endl;
+    cout << "   ./ShadowDet ../data/flickr-4159721472_c55deb37d6_b.jpg 10 10 10" << endl;
     cout << endl;
     cout << "The first argument is the input image path." << endl;
     cout << "The second argument is the lStep parameter. It must be positive." << endl;
@@ -39,7 +39,7 @@ int main(int argc, char** argv){
     cout << endl;
     cout << "Wrong argument! lStep, aStep and bStep must be positive." << endl;
     cout << "Run this executable by invoking it like this: " << endl;
-    cout << "   ./main ../data/flickr-4159721472_c55deb37d6_b.jpg 10 10 10" << endl;
+    cout << "   ./ShadowDet ../data/flickr-4159721472_c55deb37d6_b.jpg 10 10 10" << endl;
     cout << endl;
     return 1;
   }
@@ -49,7 +49,7 @@ int main(int argc, char** argv){
   if(imgSrc.empty()){
     cout << "Wrong argument! Can not open input image. Check for errors in the provided path" << endl;
     cout << "Run this executable by invoking it like this: " << endl;
-    cout << "   ./main ../data/flickr-4159721472_c55deb37d6_b.jpg 10 10 10" << endl;
+    cout << "   ./ShadowDet ../data/flickr-4159721472_c55deb37d6_b.jpg 10 10 10" << endl;
     cout << endl;
     return 1;
   }

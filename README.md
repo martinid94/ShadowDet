@@ -8,6 +8,7 @@ Folder structure of ShadowDet:
 ```
 ├── build                   # contains building files
 ├── data                    # contains some images used for testing
+├── include 		    # contains header .h file
 ├── src                     # contains source .cpp file
 ├── CMakeLists.txt
 ├── LICENSE

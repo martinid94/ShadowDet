@@ -123,6 +123,33 @@ ShadowDet/fast:
 	$(MAKE) -f CMakeFiles/ShadowDet.dir/build.make CMakeFiles/ShadowDet.dir/build
 .PHONY : ShadowDet/fast
 
+src/FindShadow.o: src/FindShadow.cpp.o
+
+.PHONY : src/FindShadow.o
+
+# target to build an object file
+src/FindShadow.cpp.o:
+	$(MAKE) -f CMakeFiles/ShadowDet.dir/build.make CMakeFiles/ShadowDet.dir/src/FindShadow.cpp.o
+.PHONY : src/FindShadow.cpp.o
+
+src/FindShadow.i: src/FindShadow.cpp.i
+
+.PHONY : src/FindShadow.i
+
+# target to preprocess a source file
+src/FindShadow.cpp.i:
+	$(MAKE) -f CMakeFiles/ShadowDet.dir/build.make CMakeFiles/ShadowDet.dir/src/FindShadow.cpp.i
+.PHONY : src/FindShadow.cpp.i
+
+src/FindShadow.s: src/FindShadow.cpp.s
+
+.PHONY : src/FindShadow.s
+
+# target to generate assembly for a file
+src/FindShadow.cpp.s:
+	$(MAKE) -f CMakeFiles/ShadowDet.dir/build.make CMakeFiles/ShadowDet.dir/src/FindShadow.cpp.s
+.PHONY : src/FindShadow.cpp.s
+
 src/Main.o: src/Main.cpp.o
 
 .PHONY : src/Main.o
@@ -159,6 +186,9 @@ help:
 	@echo "... rebuild_cache"
 	@echo "... ShadowDet"
 	@echo "... edit_cache"
+	@echo "... src/FindShadow.o"
+	@echo "... src/FindShadow.i"
+	@echo "... src/FindShadow.s"
 	@echo "... src/Main.o"
 	@echo "... src/Main.i"
 	@echo "... src/Main.s"

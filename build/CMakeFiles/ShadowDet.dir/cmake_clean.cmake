@@ -1,5 +1,6 @@
 file(REMOVE_RECURSE
   "CMakeFiles/ShadowDet.dir/src/Main.cpp.o"
+  "CMakeFiles/ShadowDet.dir/src/FindShadow.cpp.o"
   "ShadowDet.pdb"
   "ShadowDet"
 )

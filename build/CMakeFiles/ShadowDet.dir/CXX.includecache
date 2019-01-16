@@ -6,7 +6,7 @@
 
 #IncludeRegexTransform: 
 
-/home/davide/Scrivania/ShadowDet/src/Main.cpp
+../include/FindShadow.h
 opencv2/core/core.hpp
 -
 opencv2/highgui/highgui.hpp
@@ -25,6 +25,22 @@ map
 -
 cmath
 -
+thread
+-
+chrono
+-
+ctime
+-
+mutex
+-
+
+/home/davide/Scrivania/ShadowDet/src/FindShadow.cpp
+FindShadow.h
+/home/davide/Scrivania/ShadowDet/src/FindShadow.h
+
+/home/davide/Scrivania/ShadowDet/src/Main.cpp
+FindShadow.h
+/home/davide/Scrivania/ShadowDet/src/FindShadow.h
 
 /usr/local/include/opencv/cxcore.h
 opencv2/core/core_c.h

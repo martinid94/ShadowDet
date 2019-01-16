@@ -1,20 +1,20 @@
+/**
+ * @file Main.cpp
+ *  The goal of the code in this file is to provide an effective strategy to segment
+ *  a picture into shadow and non-shadow areas. In particular, it relies on OpenCV library
+ *  to convert the input RGB image into the CIE L*a*b* (or Lab) color space and to retrieve
+ *  connected components.
+ *  The results are printed in an external file in order to easily retrieve the data.
+ *
+ * @author Martini Davide
+ * @version 1.0
+ * @since 1.0
+ *
+ */
 
-#include <opencv2/core/core.hpp>
-#include <opencv2/highgui/highgui.hpp>
-#include <opencv2/imgproc/imgproc.hpp>
-
-#include <iostream>
-#include <string>
-#include <sstream>
-#include <vector>
-#include <map>
-#include <cmath>
-
-using namespace cv;
-using namespace std;
+#include "FindShadow.h"
 
 int main(int argc, char** argv){
-  Mat imgSrc, imgLAB;
 
   if (argc != 5){
     cout << endl;
@@ -34,7 +34,6 @@ int main(int argc, char** argv){
   const int aStep = atoi(argv[3]);
   const int bStep = atoi(argv[4]);
 
-
   if(aStep <= 0 || bStep <=0 || lStep <= 0){
     cout << endl;
     cout << "Wrong argument! lStep, aStep and bStep must be positive." << endl;
@@ -44,17 +43,24 @@ int main(int argc, char** argv){
     return 1;
   }
 
+  chrono::time_point<chrono::system_clock> start, end;
+  start = chrono::system_clock::now();
+
+  Mat imgSrc;
   imgSrc = imread(srcPath);
 
   if(imgSrc.empty()){
     cout << "Wrong argument! Can not open input image. Check for errors in the provided path" << endl;
     cout << "Run this executable by invoking it like this: " << endl;
-    cout << "   ./ShadowDet ../data/flickr-4159721472_c55deb37d6_b.jpg 10 10 10" << endl;
+    cout << "   ./main ../data/flickr-4159721472_c55deb37d6_b.jpg 10 10 10" << endl;
     cout << endl;
     return 1;
   }
 
+  imwrite("Input.jpg", imgSrc);
+
   // in this process we use CIE LAB color space
+  Mat imgLAB;
   cvtColor(imgSrc, imgLAB, COLOR_RGB2Lab);
 
   Mat channelLAB[3];
@@ -63,30 +69,21 @@ int main(int argc, char** argv){
   Mat imgA = channelLAB[1];
   Mat imgB = channelLAB[2];
 
-  // write the files to see results
-  imwrite("LAB.jpg", imgLAB);
-  imwrite("L.jpg", imgL);
-  imwrite("A.jpg", imgA);
-  imwrite("B.jpg", imgB);
-
   //bilateral filter to reduce noise but preserve edges
   Mat lFiltered;
   bilateralFilter(imgL, lFiltered, 5, 80, 80);
-
   imgL = lFiltered;
   imwrite("L_BFiltered.jpg", lFiltered);
   lFiltered.release();
 
   Mat aFiltered;
   bilateralFilter(imgA, aFiltered, 5, 80, 80);
-  //GaussianBlur(imgA, temp, Size(5, 5), 10, 10);
   imgA = aFiltered;
   imwrite("A_BFiltered.jpg", aFiltered);
   aFiltered.release();
 
   Mat bFiltered;
   bilateralFilter(imgB, bFiltered, 5, 80, 80);
-  //GaussianBlur(imgB, temp, Size(5, 5), 10, 10);
   imgB = bFiltered;
   imwrite("B_BFiltered.jpg", bFiltered);
   bFiltered.release();
@@ -95,8 +92,7 @@ int main(int argc, char** argv){
   // these values are considered as the "background light" so they allow to
   // distinguish "probably shadow pixels" (PSP) from surely "not shadow pixels" (NSP)
   double avgLValue = mean(imgL)[0];
-
-  cout << "average L value " << avgLValue << endl;
+  cout << "Mean lightness value: " << avgLValue << endl;
 
   Mat avgL(imgL.size(), CV_16SC1, avgLValue); //16 bits SIGNED per pixel -> short data type
   Mat imgL16;
@@ -108,43 +104,43 @@ int main(int argc, char** argv){
   // that's why I used CV_16SC1
   Mat normAvgL(imgL16.size(), CV_16SC1);
   normAvgL = imgL16 - avgL;
-
   // release memory
   avgL.release();
+  imgL16.release();
 
   // create the masks
   Mat maskAvgL = Mat_<uchar>::zeros(imgL.size());
 
   // each negative pixel in norm images is a PSP, otherwise it is a NSP.
-  // in the resulting masks, each PSP value is set to the one assumed in the luminance image
+  // in the resulting masks, each PSP value is set to the one assumed in the luminance image plus 1
   // while each NSP remains set to 0
   int maskPixels = 0;
   for(int i = 0; i < imgL.rows; i++){
     for(int j = 0; j < imgL.cols; j++){
-      if(normAvgL.at<short> (i,j) < 0){
-        maskAvgL.at<uchar> (i,j) = 1 + imgL.at<uchar> (i, j);
+      if(normAvgL.at<short> (i, j) < 0){
+        maskAvgL.at<uchar> (i, j) = 1 + imgL.at<uchar> (i, j);
         maskPixels++;
       }
     }
   }
 
   // write the files to see results
-  imwrite("mask_step_one.jpg", maskAvgL);
+  imwrite("../results/mask_step_one.jpg", maskAvgL);
 
   // now further computation to detect the shadow pixels (SP) from the PSP
   map<tuple<int, int, int> , vector<Point> > labMap;
   map<tuple<int, int, int>, vector<Point> >::iterator labIt;
 
-  // fill the map:
-  // key = a*, b* color bin
+  // fill  labMap:
+  // key = (l*, a*, b*) pixel component. It represents a color bin
   // value = points of the mask in the bin
   for (int i = 0; i < maskAvgL.rows; i++){
     for (int j = 0; j < maskAvgL.cols; j++){
       if (maskAvgL.at<uchar> (i, j) != 0){
         Point p(i, j);
-        int theB = ceil(imgB.at<uchar> (i, j) / bStep);
-        int theA = ceil(imgA.at<uchar> (i, j) / aStep);
         int theL = ceil(imgL.at<uchar> (i, j) / lStep);
+        int theA = ceil(imgA.at<uchar> (i, j) / aStep);
+        int theB = ceil(imgB.at<uchar> (i, j) / bStep);
         tuple<int, int, int> key = make_tuple(theL, theA, theB);
 
         labIt = labMap.find(key);
@@ -160,106 +156,99 @@ int main(int argc, char** argv){
     }
   }
 
-  cout << "labMap created. labMap size: " << labMap.size() << endl;
-
+  int labMapPixels = 0;
   for (labIt = labMap.begin(); labIt != labMap.end(); labIt++){
-    tuple<int, int, int> labValues = labIt->first;
     vector<Point> labPixels = labIt->second;
-    Mat labTemp = Mat_<uchar>::zeros(maskAvgL.size());
+    labMapPixels = labMapPixels + labPixels.size();
+  }
 
-    // fill labTemp
-    for (int w = 0; w < labPixels.size(); w++){
-      Point p = labPixels[w];
-      labTemp.at<uchar> (p.x, p.y) = 255;
-    }
+  if(maskPixels == labMapPixels){
+    cout << "labMap succesfully created. Bins in labMap: " << labMap.size() << endl;
+  }
 
-    // find connected pixels with same color component
-    Mat labLabels;
-    int labComp = connectedComponents(labTemp, labLabels);
-    labTemp.release();
+  // group connected components for each bin in labMap
+  // use thread pool to analyze each patch
+  const int poolSize = thread::hardware_concurrency();
+  cout << "Max threads concurrent: " << poolSize << endl;
 
-    cout << "current bin (" << get<0>(labValues) << ", " << get<1>(labValues) << ", " << get<2>(labValues) << ") -> totPixels: " << labPixels.size()
-    << ", labComponents: " << labComp << endl;
+  vector<Point> shadowPoints;
+  vector<thread> threads;
+  labIt = labMap.begin();
 
-    // for each component, retrieve its pixels and split them in terms of lightness
-    for (int cc = 1; cc < labComp; cc++){
-      vector<Point> labCompPixels; // store pixels in the current component
+  while(labIt != labMap.end()){
+    for(int t = 0; t < poolSize; t++){
+      if(labIt != labMap.end() && threads.size() < poolSize){
+        // retrieve pixels from the same bin
+        vector<Point> labPixels = labIt->second;
+        tuple<int, int, int> labValues = labIt->first;
+        vector<vector<Point> > labCComps;
+        Mat labTemp = Mat_<uchar>::zeros(imgL.size());
 
-      // retrieve pixels
-      for(int i = 0; i < labLabels.rows; i++){
-        for(int j = 0; j < labLabels.cols; j++){
-          if(labLabels.at<int> (i,j) == cc){
-            labCompPixels.push_back(Point(i,j));
-          }
+        // fill labTemp
+        for (int w = 0; w < labPixels.size(); w++){
+          Point p = labPixels[w];
+          labTemp.at<uchar> (p.x, p.y) = 255;
         }
-      }
 
-      vector<Point> border;
-      Mat supportBorder = Mat_<uchar>::zeros(labLabels.size());
+        // find connected components with same l*a*b* component
+        Mat labLabels;
+        int labComp = connectedComponents(labTemp, labLabels);
+        labTemp.release();
 
-      // retrieve border pixels
-      for(int w = 0; w < labCompPixels.size(); w++){
-        Point p = labCompPixels[w];
-        int i = p.x;
-        int j = p.y;
-        if(i != 0 && j != 0 && i != (labLabels.rows - 1) && j != (labLabels.cols - 1)){
-          for(int x = -1; x <= 1; x++){
-            for(int y = -1; y <= 1; y++){
-              if(y == 0 && x == 0){
-                continue;
-              }
-              else{
-                if(labLabels.at<int> (i+x,j+y) != cc && supportBorder.at<uchar> (i+x,j+y) == 0){
-                  border.push_back(Point(i+x,j+y));
-                  supportBorder.at<uchar> (i+x,j+y) = 255;
-                }
+        // for each component, retrieve its pixels
+        for (int cc = 1; cc < labComp; cc++){
+          vector<Point> labCompPixels; // store pixels in the current component
+
+          // retrieve pixels
+          for(int i = 0; i < labLabels.rows; i++){
+            for(int j = 0; j < labLabels.cols; j++){
+              if(labLabels.at<int> (i,j) == cc){
+                labCompPixels.push_back(Point(i,j));
               }
             }
           }
+
+          labCComps.push_back(labCompPixels);
         }
+
+        // lauch thread form the pool to compute if some patches in labCComps are shadows.
+        threads.push_back(thread(findShadow, imgL, imgA, imgB, labValues, labCComps, lStep, aStep, bStep, ref(shadowPoints)));
+        // move to the next bin of labMap
+        labIt++;
       }
-
-      supportBorder.release(); // only needed not to have double pixels in border
-
-      // look at border lightness
-      // if there is a pixel with same lightness as the component, it means that the component is part of a shadow that lies on a non-uniform background
-      // othrewise it is an object
-      bool isShadow = false;
-      for (int w = 0; w < border.size(); w++){
-        Point bp = border[w];
-        int bpL = ceil(imgL.at<uchar>(bp.x, bp.y) / lStep);
-        int bpA = ceil(imgA.at<uchar> (bp.x, bp.y) / aStep);
-        int bpB = ceil(imgB.at<uchar> (bp.x, bp.y) / bStep);
-
-        // bp is lighter than the component (or zero in the temporary mask) but has same color of the component
-        if(bpL > get<0>(labValues) && get<0>(labValues) > 0 && bpA == get<1>(labValues) && bpB == get<2>(labValues)){
-              isShadow = true;
-              break;
-        }
-        // bp has the same lightness as the component but different color
-        // --> shadow on eterogeneous background
-        // --> gives problems for black objects
-        //if(bpL == get<0>(labValues)){
-        //  isShadow = true;
-        //  break;
-        //}
-      }
-
-      for (int w = 0; w < labCompPixels.size(); w++){
-        Point p = labCompPixels[w];
-        if(isShadow){
-          maskAvgL.at<uchar> (p.x, p.y) = 255;
-        }
-        else{
-          maskAvgL.at<uchar> (p.x, p.y) = 0;
-        }
+      else{
+        // reached the end of labMap
+        break;
       }
     }
+
+    // the thread pool is full, wait for them to finish
+    for(int t = 0; t < threads.size(); t++){
+      threads[t].join();
+    }
+
+    // free the pool
+    threads.erase(threads.begin(), threads.end());
+  }
+
+  // write the final result
+  Mat maskFinal = Mat_<uchar>::zeros(maskAvgL.size());
+
+  for (int i = 0; i < shadowPoints.size(); i++){
+    Point p = shadowPoints[i];
+    maskFinal.at<uchar> (p.x, p.y) = 255;
   }
 
   stringstream sstm;
-  sstm << "mask_step_two_lStep" << lStep << "_aStep" << aStep << "_bStep" << bStep << ".jpg";
+  sstm << "../results/mask_step_two_lStep" << lStep << "_aStep" << aStep << "_bStep" << bStep << ".jpg";
   string s = sstm.str();
-  imwrite(s, maskAvgL);
+  imwrite(s, maskFinal);
+
+  end = chrono::system_clock::now();
+  int elapsed_seconds = chrono::duration_cast<std::chrono::milliseconds> (end-start).count();
+  time_t end_time = chrono::system_clock::to_time_t(end);
+
+  cout << "Finished computation at " << ctime(&end_time) << " Elapsed time: " << elapsed_seconds << " ms" << endl;
+
   return 0;
 }

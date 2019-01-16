@@ -4,6 +4,7 @@ set(CMAKE_DEPENDS_LANGUAGES
   )
 # The set of files for implicit dependencies of each language:
 set(CMAKE_DEPENDS_CHECK_CXX
+  "/home/davide/Scrivania/ShadowDet/src/FindShadow.cpp" "/home/davide/Scrivania/ShadowDet/build/CMakeFiles/ShadowDet.dir/src/FindShadow.cpp.o"
   "/home/davide/Scrivania/ShadowDet/src/Main.cpp" "/home/davide/Scrivania/ShadowDet/build/CMakeFiles/ShadowDet.dir/src/Main.cpp.o"
   )
 set(CMAKE_CXX_COMPILER_ID "GNU")
@@ -12,6 +13,7 @@ set(CMAKE_CXX_COMPILER_ID "GNU")
 set(CMAKE_CXX_TARGET_INCLUDE_PATH
   "/usr/local/include"
   "/usr/local/include/opencv"
+  "../include"
   )
 
 # Targets to which this target links.

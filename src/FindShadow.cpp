@@ -14,43 +14,81 @@
 
 #include "FindShadow.h"
 
-mutex sPointsMutex; // mutex used to protect access to shadowPoints
+mutex ccMutex; // mutex used to make connectedComponents() thread safe
+mutex spMutex; // mutex used to protect access to shadowPoints
 mutex printMutex; // mutex used to protect access to standard output
 
 /**
-* This function states if a connected component composed by pixels with equal l*, a* and b* is a shadow or not.
-* In order to do this, it computes the border of each component. Then it looks for a border pixels with a* and b*
+* This function examines a set of pixels with common l*a*b* components and returns the ones that belong to a shadow.
+* At first, connected components are extracted and then each one is analyzed to state if it is a shadow or not.
+* In order to do this, this function computes the border of each patch. Then it looks for a border pixels with a* and b*
 * equal as those of the component, but with higher lightnes value. If such a pixel is found, then the component is
-* a shadow patch.
+* a shadow patch and all its pixels are returned as shadow pixels.
 *
 * @param imgL l* component of the filtered input image
 * @param imgA a* component of the filtered input image
 * @param imgB b* component of the filtered input image
 * @param labValues l*, a*, b* values of all pixels in the provided components
-* @param labCComps vector of connected components with equal l*, a*, b* values
+* @param labPixels vector of points (i, j) with equal l*, a*, b* values
 * @param lStep step used to group l* components. See Main.cpp for more details
 * @param aStep step used to group a* components. See Main.cpp for more details
 * @param bStep step used to group b* components. See Main.cpp for more details
 * @param shadowPoints vector used to store shadow pixels. It is shared by threads that call this function. See Main.cpp for more details
 */
 void findShadow(Mat imgL, Mat imgA, Mat imgB, tuple<int, int, int> labValues,
-    vector<vector<Point> > labCComps, int lStep, int aStep, int bStep, vector<Point>& shadowPoints){
+    vector<Point> labPixels, int lStep, int aStep, int bStep, vector<Point>& shadowPoints){
 
+  // measure elapsed time to perform the procedure
   chrono::time_point<chrono::system_clock> Tstart, Tend;
   Tstart = chrono::system_clock::now();
-  int pixelCounter = 0;
 
+  // compute all connected components. See https://docs.opencv.org/3.4.3/d3/dc0/group__imgproc__shape.html
+  Mat temp = Mat_<uchar>::zeros(imgL.size());
+  for (int w = 0; w < labPixels.size(); w++){
+    Point p = labPixels[w];
+    temp.at<uchar> (p.x, p.y) = 255;
+  }
+
+  Mat labLabels;
+  ccMutex.lock(); // connectedComponents() is itself multithreaded and not thread safe
+  int labComp = connectedComponents(temp, labLabels);
+  ccMutex.unlock();
+  temp.release();
+
+  // retrieve each component's pixels and store them separately for further computation
+  vector<vector<Point> > labCComps;
+  for (int cc = 1; cc < labComp; cc++){ // cc = 0 represents the black background
+    vector<Point> labCompPixels; // store pixels in the current component
+
+    // collect pixels
+    for(int i = 0; i < labLabels.rows; i++){
+      for(int j = 0; j < labLabels.cols; j++){
+        if(labLabels.at<int> (i,j) == cc){
+          labCompPixels.push_back(Point(i,j));
+        }
+      }
+    }
+
+    labCComps.push_back(labCompPixels);
+  }
+
+  int pixelCounter = 0; // only used to output information to the user
+
+  // for each connected component, define if it is a shadow or not
   for(int labCC = 0; labCC < labCComps.size(); labCC++){
     vector<Point> labCompPixels = labCComps[labCC];
     vector<Point> border;
     Mat supportBorder = Mat_<uchar>::zeros(imgL.size()); // used to avoid duplicates in border
+    Mat temp = Mat_<uchar>::zeros(imgL.size());
     pixelCounter = pixelCounter + labCompPixels.size();
 
     // retrieve border pixels
+    // try opencv findContours() <-------------------------
     for(int w = 0; w < labCompPixels.size(); w++){
       Point p = labCompPixels[w];
       int i = p.x;
       int j = p.y;
+      temp.at<uchar>(i, j) = 1;
       if(i != 0 && j != 0 && i != (imgL.rows - 1) && j != (imgL.cols - 1)){
         for(int x = -1; x <= 1; x++){
           for(int y = -1; y <= 1; y++){
@@ -90,15 +128,16 @@ void findShadow(Mat imgL, Mat imgA, Mat imgB, tuple<int, int, int> labValues,
 
     if(isShadow){
       // write shadow pixels in the common container
-      sPointsMutex.lock();
+      spMutex.lock();
       for (int w = 0; w < labCompPixels.size(); w++){
         Point p = labCompPixels[w];
         shadowPoints.push_back(p);
       }
-      sPointsMutex.unlock();
+      spMutex.unlock();
     }
   }
 
+  // provide information to the user
   Tend = chrono::system_clock::now();
   int Telapsed_seconds = chrono::duration_cast<std::chrono::milliseconds> (Tend-Tstart).count();
 

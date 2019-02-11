@@ -30,5 +30,5 @@ using namespace std;
 #define FS__H
 
 void findShadow(Mat imgL, Mat imgA, Mat imgB, tuple<int, int, int> labValues,
-    vector<vector<Point> > labCComps, int lStep, int aStep, int bStep, vector<Point>& shadowPoints);
+    vector<Point> labPixels, int lStep, int aStep, int bStep, vector<Point>& shadowPoints);
 #endif

@@ -4,7 +4,7 @@
  *  a picture into shadow and non-shadow areas. In particular, it relies on OpenCV library
  *  to convert the input RGB image into the CIE L*a*b* (or Lab) color space and to retrieve
  *  connected components.
- *  The results are printed in an external file in order to easily retrieve the data.
+ *  The results are printed in an external file in order to easily analyze the output.
  *
  * @author Martini Davide
  * @version 1.0
@@ -52,7 +52,7 @@ int main(int argc, char** argv){
   if(imgSrc.empty()){
     cout << "Wrong argument! Can not open input image. Check for errors in the provided path" << endl;
     cout << "Run this executable by invoking it like this: " << endl;
-    cout << "   ./main ../data/flickr-4159721472_c55deb37d6_b.jpg 10 10 10" << endl;
+    cout << "   ./ShadowDet ../data/flickr-4159721472_c55deb37d6_b.jpg 10 10 10" << endl;
     cout << endl;
     return 1;
   }
@@ -166,70 +166,35 @@ int main(int argc, char** argv){
     cout << "labMap succesfully created. Bins in labMap: " << labMap.size() << endl;
   }
 
-  // group connected components for each bin in labMap
-  // use thread pool to analyze each patch
+  // use thread pool to analyze each (key, value) pair in labMap
   const int poolSize = thread::hardware_concurrency();
   cout << "Max threads concurrent: " << poolSize << endl;
-
-  vector<Point> shadowPoints;
   vector<thread> threads;
+  vector<Point> shadowPoints;
   labIt = labMap.begin();
 
   while(labIt != labMap.end()){
-    for(int t = 0; t < poolSize; t++){
-      if(labIt != labMap.end() && threads.size() < poolSize){
-        // retrieve pixels from the same bin
-        vector<Point> labPixels = labIt->second;
-        tuple<int, int, int> labValues = labIt->first;
-        vector<vector<Point> > labCComps;
-        Mat labTemp = Mat_<uchar>::zeros(imgL.size());
-
-        // fill labTemp
-        for (int w = 0; w < labPixels.size(); w++){
-          Point p = labPixels[w];
-          labTemp.at<uchar> (p.x, p.y) = 255;
-        }
-
-        // find connected components with same l*a*b* component
-        Mat labLabels;
-        int labComp = connectedComponents(labTemp, labLabels);
-        labTemp.release();
-
-        // for each component, retrieve its pixels
-        for (int cc = 1; cc < labComp; cc++){
-          vector<Point> labCompPixels; // store pixels in the current component
-
-          // retrieve pixels
-          for(int i = 0; i < labLabels.rows; i++){
-            for(int j = 0; j < labLabels.cols; j++){
-              if(labLabels.at<int> (i,j) == cc){
-                labCompPixels.push_back(Point(i,j));
-              }
-            }
-          }
-
-          labCComps.push_back(labCompPixels);
-        }
-
-        // lauch thread form the pool to compute if some patches in labCComps are shadows.
-        threads.push_back(thread(findShadow, imgL, imgA, imgB, labValues, labCComps, lStep, aStep, bStep, ref(shadowPoints)));
-        // move to the next bin of labMap
-        labIt++;
-      }
-      else{
-        // reached the end of labMap
-        break;
-      }
+    if(threads.size() < poolSize){
+      // lauch thread form the pool. See FindShadow.cpp for more information
+      threads.push_back(thread(findShadow, imgL, imgA, imgB, labIt->first, labIt->second, lStep, aStep, bStep, ref(shadowPoints)));
+      labIt++; // move to the next (key, value) pair in labMap
     }
-
-    // the thread pool is full, wait for them to finish
-    for(int t = 0; t < threads.size(); t++){
-      threads[t].join();
+    else{
+      // wait for threads to finish their computation
+      for(int t = 0; t < threads.size(); t++){
+        threads[t].join();
+      }
+      // free the pool
+      threads.erase(threads.begin(), threads.end());
     }
-
-    // free the pool
-    threads.erase(threads.begin(), threads.end());
   }
+
+  // wait for active threads remaining
+  for(int t = 0; t < threads.size(); t++){
+    threads[t].join();
+  }
+  // free the pool
+  threads.erase(threads.begin(), threads.end());
 
   // write the final result
   Mat maskFinal = Mat_<uchar>::zeros(maskAvgL.size());
@@ -244,6 +209,7 @@ int main(int argc, char** argv){
   string s = sstm.str();
   imwrite(s, maskFinal);
 
+  // provide information to the user
   end = chrono::system_clock::now();
   int elapsed_seconds = chrono::duration_cast<std::chrono::milliseconds> (end-start).count();
   time_t end_time = chrono::system_clock::to_time_t(end);

@@ -83,7 +83,6 @@ void findShadow(Mat imgL, Mat imgA, Mat imgB, tuple<int, int, int> labValues,
     pixelCounter = pixelCounter + labCompPixels.size();
 
     // retrieve border pixels
-    // try opencv findContours() <-------------------------
     for(int w = 0; w < labCompPixels.size(); w++){
       Point p = labCompPixels[w];
       int i = p.x;

@@ -19,7 +19,7 @@ int main(int argc, char** argv){
   if (argc != 5){
     cout << endl;
     cout << "Run this executable by invoking it like this: " << endl;
-    cout << "   ./ShadowDet ../data/flickr-4159721472_c55deb37d6_b.jpg 10 10 10" << endl;
+    cout << "   ./ShadowDet ../data/flickr-4159721472_c55deb37d6_b.jpg 20 50 50" << endl;
     cout << endl;
     cout << "The first argument is the input image path." << endl;
     cout << "The second argument is the lStep parameter. It must be positive." << endl;
@@ -38,7 +38,7 @@ int main(int argc, char** argv){
     cout << endl;
     cout << "Wrong argument! lStep, aStep and bStep must be positive." << endl;
     cout << "Run this executable by invoking it like this: " << endl;
-    cout << "   ./ShadowDet ../data/flickr-4159721472_c55deb37d6_b.jpg 10 10 10" << endl;
+    cout << "   ./ShadowDet ../data/flickr-4159721472_c55deb37d6_b.jpg 20 50 50" << endl;
     cout << endl;
     return 1;
   }
@@ -46,22 +46,20 @@ int main(int argc, char** argv){
   chrono::time_point<chrono::system_clock> start, end;
   start = chrono::system_clock::now();
 
-  Mat imgSrc;
-  imgSrc = imread(srcPath);
+  Mat imgRGB;
+  imgRGB = imread(srcPath);
 
-  if(imgSrc.empty()){
+  if(imgRGB.empty()){
     cout << "Wrong argument! Can not open input image. Check for errors in the provided path" << endl;
     cout << "Run this executable by invoking it like this: " << endl;
-    cout << "   ./ShadowDet ../data/flickr-4159721472_c55deb37d6_b.jpg 10 10 10" << endl;
+    cout << "   ./ShadowDet ../data/flickr-4159721472_c55deb37d6_b.jpg 50 50 50" << endl;
     cout << endl;
     return 1;
   }
 
-  imwrite("Input.jpg", imgSrc);
-
   // in this process we use CIE LAB color space
   Mat imgLAB;
-  cvtColor(imgSrc, imgLAB, COLOR_RGB2Lab);
+  cvtColor(imgRGB, imgLAB, COLOR_RGB2Lab);
 
   Mat channelLAB[3];
   split(imgLAB, channelLAB);
@@ -73,53 +71,59 @@ int main(int argc, char** argv){
   Mat lFiltered;
   bilateralFilter(imgL, lFiltered, 5, 80, 80);
   imgL = lFiltered;
-  imwrite("L_BFiltered.jpg", lFiltered);
   lFiltered.release();
 
   Mat aFiltered;
   bilateralFilter(imgA, aFiltered, 5, 80, 80);
   imgA = aFiltered;
-  imwrite("A_BFiltered.jpg", aFiltered);
   aFiltered.release();
 
   Mat bFiltered;
   bilateralFilter(imgB, bFiltered, 5, 80, 80);
   imgB = bFiltered;
-  imwrite("B_BFiltered.jpg", bFiltered);
   bFiltered.release();
 
-  // compute the average and the median value of the luminance component
+  // compute the mean and the standard deviation of the luminance component
   // these values are considered as the "background light" so they allow to
   // distinguish "probably shadow pixels" (PSP) from surely "not shadow pixels" (NSP)
-  double avgLValue = mean(imgL)[0];
-  cout << "Mean lightness value: " << avgLValue << endl;
+  Mat imgLD, meanL, stdDevL;
+  bool useSTD = true;
+  imgL.convertTo(imgLD, CV_64FC1);
+  meanStdDev(imgLD, meanL, stdDevL);
+  if(stdDevL.at<double> (0, 0) <  (double) 255 / 6){
+    useSTD = false;
+  }
 
-  Mat avgL(imgL.size(), CV_16SC1, avgLValue); //16 bits SIGNED per pixel -> short data type
-  Mat imgL16;
-  imgL.convertTo(imgL16, CV_16SC1); //16 bits SIGNED per pixel -> short data type
+  cout << "Mean lightness value: " << meanL.at<double> (0, 0) << ", standard deviation: " << stdDevL.at<double> (0, 0)
+       << " useSTD: " << useSTD << endl;
 
-  // compute the normalized images subtracting background light
-  // pixels greater than average/median light are positive in norm images
-  // pixels smaller than average/median light are negative in norm images
-  // that's why I used CV_16SC1
-  Mat normAvgL(imgL16.size(), CV_16SC1);
-  normAvgL = imgL16 - avgL;
-  // release memory
-  avgL.release();
-  imgL16.release();
-
-  // create the masks
+  // create the mask
   Mat maskAvgL = Mat_<uchar>::zeros(imgL.size());
 
-  // each negative pixel in norm images is a PSP, otherwise it is a NSP.
+  // depending on the standard deviation on imgL, each pixel with lightness component less than meanL - stdDevL/3
+  // or simply meanL is a PSP, otherwise it is a NSP.
   // in the resulting masks, each PSP value is set to the one assumed in the luminance image plus 1
   // while each NSP remains set to 0
   int maskPixels = 0;
-  for(int i = 0; i < imgL.rows; i++){
-    for(int j = 0; j < imgL.cols; j++){
-      if(normAvgL.at<short> (i, j) < 0){
-        maskAvgL.at<uchar> (i, j) = 1 + imgL.at<uchar> (i, j);
-        maskPixels++;
+  for(int i = 0; i < maskAvgL.rows; i++){
+    for(int j = 0; j < maskAvgL.cols; j++){
+      if(useSTD){
+        if(imgLD.at<double> (i, j) < (meanL.at<double> (0, 0) - (stdDevL.at<double> (0, 0) / 3))){
+          maskAvgL.at<uchar> (i, j) = 1 + imgL.at<uchar> (i, j);
+          maskPixels++;
+        }
+        else{
+          maskAvgL.at<uchar> (i, j) = 0;
+        }
+      }
+      else{
+        if(imgLD.at<double> (i, j) < meanL.at<double> (0, 0)){
+          maskAvgL.at<uchar> (i, j) = 1 + imgL.at<uchar> (i, j);
+          maskPixels++;
+        }
+        else{
+          maskAvgL.at<uchar> (i, j) = 0;
+        }
       }
     }
   }
@@ -163,7 +167,7 @@ int main(int argc, char** argv){
   }
 
   if(maskPixels == labMapPixels){
-    cout << "labMap succesfully created. Bins in labMap: " << labMap.size() << endl;
+    cout << "labMap succesfully created. Entries in labMap: " << labMap.size() << endl;
   }
 
   // use thread pool to analyze each (key, value) pair in labMap
